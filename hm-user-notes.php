@@ -2,7 +2,7 @@
 /**
  * Plugin Name: HM User Notes
  * Description: Allows logged-in users to add private comments to posts that only they can see
- * Version: 1.0.0
+ * Version: __VERSION__
  * Author: Human Made
  * Requires at least: 6.0
  * Requires PHP: 7.4
