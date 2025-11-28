@@ -1,0 +1,27 @@
+{
+	"name": "humanmade/hm-user-notes",
+	"description": "Allows logged-in users to add private comments to posts that only they can see",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"authors": [
+		{
+			"name": "Human Made",
+			"homepage": "https://humanmade.com"
+		}
+	],
+	"require": {
+		"php": "^7.4 || ^8.0"
+	},
+	"require-dev": {
+		"humanmade/coding-standards": "^3.0"
+	},
+	"scripts": {
+		"lint": "phpcs --standard=phpcs.xml .",
+		"lint:fix": "phpcbf --standard=phpcs.xml ."
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		}
+	}
+}

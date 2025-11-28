@@ -1,0 +1,21 @@
+/**
+ * Editor styles for HM User Notes.
+ */
+
+/* Hide everything except the textarea in the user note form variant */
+.wp-block.hm-user-note-form .comment-form label,
+.wp-block.hm-user-note-form .comment-reply-title,
+.wp-block.hm-user-note-form .logged-in-as,
+.wp-block.hm-user-note-form .comment-form .form-submit {
+	display: none !important;
+}
+
+/* Ensure the textarea is visible and styled appropriately */
+.wp-block.hm-user-note-form .comment-form-comment {
+	margin: 0;
+}
+
+.wp-block.hm-user-note-form .comment-form-comment textarea {
+	width: 100%;
+	min-height: 150px;
+}
