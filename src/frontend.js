@@ -37,12 +37,14 @@ function saveNote( content, commentId, postId, form ) {
 		? `/wp-json/wp/v2/comments/${ commentId }`
 		: '/wp-json/wp/v2/comments';
 
+	const userNote = window.hmUserNotes[ postId ] || {};
+
 	const body = isUpdate
 		? { content }
 		: {
 				content,
 				post: postId,
-				author: window.hmUserNotes?.userId,
+				author: userNote?.userId,
 		  };
 
 	fetch( url, {
@@ -50,7 +52,7 @@ function saveNote( content, commentId, postId, form ) {
 		credentials: 'include',
 		headers: {
 			'Content-Type': 'application/json',
-			'X-WP-Nonce': window.hmUserNotes?.nonce || '',
+			'X-WP-Nonce': userNote?.nonce || '',
 			'X-HM-User-Note': 1,
 		},
 		body: JSON.stringify( body ),
@@ -67,8 +69,8 @@ function saveNote( content, commentId, postId, form ) {
 
 			// If this was a new note, update the stored ID
 			if ( ! isUpdate && data.id ) {
-				if ( window.hmUserNotes ) {
-					window.hmUserNotes.existingNote = {
+				if ( userNote ) {
+					userNote.existingNote = {
 						id: data.id,
 						content,
 					};
@@ -79,8 +81,8 @@ function saveNote( content, commentId, postId, form ) {
 				if ( commentIdField ) {
 					commentIdField.value = data.id;
 				}
-			} else if ( window.hmUserNotes?.existingNote ) {
-				window.hmUserNotes.existingNote.content = content;
+			} else if ( userNote?.existingNote ) {
+				window.hmUserNotes[ postId ].existingNote.content = content;
 			}
 		} )
 		.catch( ( error ) => {
@@ -164,8 +166,8 @@ function initFrontend() {
 
 			showSaveIndicator( form, 'saving' );
 
-			const commentId = window.hmUserNotes?.existingNote?.id;
-			const postId = window.hmUserNotes?.postId;
+			const postId = form.querySelector( 'input[name="comment_post_ID"]' ).value;
+			const commentId = window.hmUserNotes[ postId ]?.existingNote?.id;
 
 			saveNote( content, commentId, postId, form );
 		}, 1000 );

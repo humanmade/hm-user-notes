@@ -12,8 +12,7 @@ use HM\UserNotes\CommentType;
  */
 function init() {
 	add_action( 'enqueue_block_editor_assets', __NAMESPACE__ . '\\enqueue_editor_assets' );
-	add_action( 'wp_enqueue_scripts', __NAMESPACE__ . '\\enqueue_frontend_assets' );
-	add_action( 'wp_footer', __NAMESPACE__ . '\\output_user_note_data' );
+	add_filter( 'render_block_core/post-comments-form', __NAMESPACE__ . '\\render_block_post_comments_form', 10, 3 );
 }
 
 /**
@@ -48,13 +47,15 @@ function enqueue_editor_assets() {
 			'hm-user-notes-editor',
 			'hmUserNotes',
 			[
-				'postId' => $post->ID,
-				'existingNote' => $user_note ? [
-					'id' => $user_note->comment_ID,
-					'content' => $user_note->comment_content,
-				] : null,
-				'userId' => get_current_user_id(),
-				'nonce' => wp_create_nonce( 'wp_rest' ),
+				"$post->ID" => [
+					'postId' => $post->ID,
+					'existingNote' => $user_note ? [
+						'id' => $user_note->comment_ID,
+						'content' => $user_note->comment_content,
+					] : null,
+					'userId' => get_current_user_id(),
+					'nonce' => \wp_create_nonce( 'wp_rest' ),
+				],
 			]
 		);
 	}
@@ -86,27 +87,48 @@ function enqueue_frontend_assets() {
 }
 
 /**
- * Output user note data for frontend JavaScript.
+ * Filters the content of a single block.
+ *
+ * @param string    $block_content The block content.
+ * @param array     $block         The full block, including name and attributes.
+ * @param \WP_Block $instance      The block instance.
+ * @return string The block content.
  */
-function output_user_note_data() {
-	if ( ! is_singular() || ! is_user_logged_in() ) {
-		return;
+function render_block_post_comments_form( $block_content, $block, \WP_Block $instance ) {
+	if ( strpos( $block['attrs']['className'] ?? '', 'hm-user-note-form' ) === false ) {
+		return $block_content;
 	}
 
-	$post_id = get_the_ID();
+	if ( ! is_user_logged_in() ) {
+		return '';
+	}
+
+	// We need the frontend JS and CSS now.
+	enqueue_frontend_assets();
+
+	$post_id = $instance->context['postId'] ?? get_the_ID();
 	$user_note = CommentType\get_user_note( $post_id );
 
-	?>
-	<script type="text/javascript">
-		window.hmUserNotes = {
-			postId: <?php echo json_encode( $post_id ); ?>,
-			existingNote: <?php echo json_encode( $user_note ? [
-				'id' => $user_note->comment_ID,
-				'content' => $user_note->comment_content,
-			] : null ); ?>,
-			userId: <?php echo json_encode( get_current_user_id() ); ?>,
-			nonce: <?php echo json_encode( wp_create_nonce( 'wp_rest' ) ); ?>
-		};
-	</script>
-	<?php
+	$block_content .= sprintf(
+		<<<'HTML'
+			<script type="text/javascript">
+				window.hmUserNotes = window.hmUserNotes || {};
+				window.hmUserNotes["%1$d"] = {
+					postId: %1$d,
+					existingNote: %2$s,
+					userId: %3$d,
+					nonce: %4$s
+				};
+			</script>
+			HTML,
+		json_encode( $post_id ),
+		json_encode( $user_note ? [
+			'id' => $user_note->comment_ID,
+			'content' => $user_note->comment_content,
+		] : null ),
+		json_encode( get_current_user_id() ),
+		json_encode( wp_create_nonce( 'wp_rest' ) )
+	);
+
+	return $block_content;
 }
