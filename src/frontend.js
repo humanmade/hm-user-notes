@@ -166,7 +166,9 @@ function initFrontend() {
 
 			showSaveIndicator( form, 'saving' );
 
-			const postId = form.querySelector( 'input[name="comment_post_ID"]' ).value;
+			const postId = form.querySelector(
+				'input[name="comment_post_ID"]'
+			).value;
 			const commentId = window.hmUserNotes[ postId ]?.existingNote?.id;
 
 			saveNote( content, commentId, postId, form );
