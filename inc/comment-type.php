@@ -5,6 +5,8 @@
 
 namespace HM\UserNotes\CommentType;
 
+use WP_Comment_Query;
+
 /**
  * Initialize comment type functionality.
  */
@@ -18,6 +20,21 @@ function init() {
 	add_action( 'rest_api_init', __NAMESPACE__ . '\\register_rest_fields' );
 	add_filter( 'pre_render_block', __NAMESPACE__ . '\\setup_comment_form_filters', 10, 2 );
 	add_filter( 'render_block', __NAMESPACE__ . '\\cleanup_comment_form_filters', 20, 2 );
+	add_filter( 'user_has_cap', __NAMESPACE__ . '\\filter_user_has_cap', 10, 4 );
+	add_action( 'pre_get_comments', __NAMESPACE__ . '\\action_reference_pre_get_comments', 10000 );
+	add_filter( 'comment_feed_where', __NAMESPACE__ . '\\filter_reference_comment_feed_where', 10, 2 );
+}
+
+/**
+ * Filters the WHERE clause of the comments feed query before sending.
+ *
+ * @param string    $cwhere The WHERE clause of the query.
+ * @param \WP_Query $query  The WP_Query instance (passed by reference).
+ * @return string The WHERE clause of the query.
+ */
+function filter_reference_comment_feed_where( $cwhere, \WP_Query $query ) {
+	$cwhere .= " AND comment_type != 'hm_user_note' ";
+	return $cwhere;
 }
 
 /**
@@ -230,10 +247,11 @@ function get_user_note( $post_id ) {
 	}
 
 	$comments = get_comments( [
-		'post_id' => $post_id,
-		'user_id' => $current_user_id,
-		'type'    => 'hm_user_note',
-		'number'  => 1,
+		'post_id'      => $post_id,
+		'user_id'      => $current_user_id,
+		'type'         => 'hm_user_note',
+		'type__not_in' => [],
+		'number'       => 1,
 	] );
 
 	return ! empty( $comments ) ? $comments[0] : null;
@@ -342,4 +360,60 @@ function add_existing_comment_value( $field ) {
 	);
 
 	return $field;
+}
+
+/**
+ * Dynamically filter a user's capabilities.
+ *
+ * @param bool[]   $allcaps Array of key/value pairs where keys represent a capability name and boolean values represent whether the user has that capability.
+ * @param string[] $caps    Required primitive capabilities for the requested capability.
+ * @param array    $args    { Arguments that accompany the requested capability check.
+ * 		@type string    $0 Requested capability.
+ * 		@type int       $1 Concerned user ID.
+ * 		@type mixed  ...$2 Optional second and further parameters, typically object ID.
+ * }
+ * @param \WP_User $user    The user object.
+ * @return bool[] Array of key/value pairs where keys represent a capability name and boolean values represent whether the user has that capability.
+ */
+function filter_user_has_cap( $allcaps, $caps, $args, \WP_User $user ) {
+	if ( $args[0] !== 'edit_comment' ) {
+		return $allcaps;
+	}
+
+	$user_id = $args[1];
+	$comment_id = $args[2];
+
+	if ( get_current_user_id() !== $user_id ) {
+		return $allcaps;
+	}
+
+	$comment = \get_comment( $comment_id );
+
+	if ( (int) $user_id !== (int) $comment->user_id ) {
+		return $allcaps;
+	}
+
+	$allcaps['edit_comment'] = true;
+
+	// Add required primitives.
+	foreach ( $caps as $cap ) {
+		$allcaps[ $cap ] = true;
+	}
+
+	return $allcaps;
+}
+
+/**
+ * Fires before comments are retrieved to ensure we don't leak user notes.
+ *
+ * @param WP_Comment_Query $query Current instance of WP_Comment_Query (passed by reference).
+ */
+function action_reference_pre_get_comments( WP_Comment_Query $query ) : void {
+	if ( $query->query_vars['type'] === 'hm_user_note' || in_array( 'hm_user_note', (array) $query->query_vars['type__in'], true ) ) {
+		$query->query_vars['user_id'] = \get_current_user_id();
+	} else {
+		$type__not_in = (array) ( $query->query_vars['type__not_in'] ?? [] );
+		$type__not_in[] = 'hm_user_note';
+		$query->query_vars['type__not_in'] = $type__not_in;
+	}
 }
